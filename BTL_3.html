@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-office</title>
+    <link href="bootstrap-5.0.2-dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#">E-office</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto" id="nav-links">
+                <!-- Nav links will be dynamically added here -->
+            </ul>
+        </div>
+    </div>
+</nav>
+<div class="container mt-4" id="content"></div>
+
+<script>
+let isLoggedIn = false;
+let userRole = '';
+let meetings = [];
+let notifications = [];
+let employees = [];
+let profiles = [];
+
+function showContent(page) {
+    const contentDiv = document.getElementById('content');
+    let content = '';
+
+    if (page === 'login') {
+        content = `
+            <h2>Đăng nhập</h2>
+            <form onsubmit="login(event)">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Tên đăng nhập:</label>
+                    <input type="text" class="form-control" id="username" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Mật khẩu:</label>
+                    <input type="password" class="form-control" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Đăng nhập</button>
+            </form>
+        `;
+    } else if (page === 'register') {
+        content = `
+            <h2>Đăng ký</h2>
+            <form onsubmit="register(event)">
+                <div class="mb-3">
+                    <label for="regUsername" class="form-label">Tên đăng nhập:</label>
+                    <input type="text" class="form-control" id="regUsername" required>
+                </div>
+                <div class="mb-3">
+                    <label for="regPassword" class="form-label">Mật khẩu:</label>
+                    <input type="password" class="form-control" id="regPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Đăng ký</button>
+            </form>
+        `;
+    } else if (page === 'organizeMeetings') {
+        content = `
+            <h2>Tổ chức cuộc họp</h2>
+            <button class="btn btn-primary" onclick="showMeetingForm()">Thêm cuộc họp</button>
+            <div id="meetingForm" class="hidden mt-3">
+                <h3>Thông tin cuộc họp</h3>
+                <form onsubmit="saveMeeting(event)">
+                    <div class="mb-3">
+                        <label for="meetingName" class="form-label">Tên cuộc họp:</label>
+                        <input type="text" class="form-control" id="meetingName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="meetingTime" class="form-label">Thời gian:</label>
+                        <input type="datetime-local" class="form-control" id="meetingTime" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="meetingLocation" class="form-label">Địa điểm:</label>
+                        <input type="text" class="form-control" id="meetingLocation" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="meetingDescription" class="form-label">Mô tả:</label>
+                        <textarea class="form-control" id="meetingDescription" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Lưu</button>
+                    <button type="button" class="btn btn-secondary" onclick="cancelMeeting()">Hủy</button>
+                </form>
+            </div>
+            <div id="meetingList" class="mt-3"></div>
+        `;
+    } else if (page === 'manageNotifications') {
+        content = `
+            <h2>Quản lý thông báo</h2>
+            <button class="btn btn-primary" onclick="showNotificationForm()">Thêm thông báo</button>
+            <div id="notificationForm" class="hidden mt-3">
+                <h3>Thông tin thông báo</h3>
+                <form onsubmit="saveNotification(event)">
+                    <div class="mb-3">
+                        <label for="notificationContent" class="form-label">Nội dung:</label>
+                        <textarea class="form-control" id="notificationContent" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notificationTime" class="form-label">Thời gian:</label>
+                        <input type="datetime-local" class="form-control" id="notificationTime" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Lưu</button>
+                    <button type="button" class="btn btn-secondary" onclick="cancelNotification()">Hủy</button>
+                </form>
+            </div>
+            <div id="notificationList" class="mt-3"></div>
+        `;
+    } else if (page === 'manageEmployees') {
+        content = `
+            <h2>Quản lý nhân viên</h2>
+            <button class="btn btn-primary" onclick="showEmployeeForm()">Thêm nhân viên</button>
+            <div id="employeeForm" class="hidden mt-3">
+                <h3>Thông tin nhân viên</h3>
+                <form onsubmit="saveEmployee(event)">
+                    <div class="mb-3">
+                        <label for="employeeID" class="form-label">Mã nhân viên:</label>
+                        <input type="text" class="form-control" id="employeeID" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="employeeName" class="form-label">Tên nhân viên:</label>
+                        <input type="text" class="form-control" id="employeeName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="employeeEmail" class="form-label">Email:</label>
+                        <input type="email" class="form-control" id="employeeEmail" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="employeePhone" class="form-label">Số điện thoại:</label>
+                        <input type="text" class="form-control" id="employeePhone" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="employeeAddress" class="form-label">Địa chỉ:</label>
+                        <input type="text" class="form-control" id="employeeAddress" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="employeeDOB" class="form-label">Ngày sinh:</label>
+                        <input type="date" class="form-control" id="employeeDOB" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="employeePosition" class="form-label">Chức vụ:</label>
+                        <input type="text" class="form-control" id="employeePosition" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="employeeDepartment" class="form-label">Phòng ban:</label>
+                        <input type="text" class="form-control" id="employeeDepartment" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="employeeStartDate" class="form-label">Ngày vào làm:</label>
+                        <input type="date" class="form-control" id="employeeStartDate" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="employeeSalary" class="form-label">Lương:</label>
+                        <input type="number" class="form-control" id="employeeSalary" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Lưu</button>
+                    <button type="button" class="btn btn-secondary" onclick="cancelEmployee()">Hủy</button>
+                </form>
+            </div>
+            <div id="employeeList" class="mt-3"></div>
+        `;
+    } else if (page === 'manageProfiles') {
+        content = `
+            <h2>Quản lý hồ sơ</h2>
+            <button class="btn btn-primary" onclick="showProfileForm()">Thêm hồ sơ</button>
+            <div id="profileForm" class="hidden mt-3">
+                <h3>Thông tin hồ sơ</h3>
+                <form onsubmit="saveProfile(event)">
+                    <div class="mb-3">
+                        <label for="profileName" class="form-label">Tên hồ sơ:</label>
+                        <input type="text" class="form-control" id="profileName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="profileDescription" class="form-label">Mô tả:</label>
+                        <textarea class="form-control" id="profileDescription" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="profileDate" class="form-label">Ngày:</label>
+                        <input type="date" class="form-control" id="profileDate" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Lưu</button>
+                    <button type="button" class="btn btn-secondary" onclick="cancelProfile()">Hủy</button>
+                </form>
+            </div>
+            <div id="profileList" class="mt-3"></div>
+        `;
+    }
+
+    contentDiv.innerHTML = content;
+    if (page === 'organizeMeetings') loadMeetings();
+    else if (page === 'manageNotifications') loadNotifications();
+    else if (page === 'manageEmployees') loadEmployees();
+    else if (page === 'manageProfiles') loadProfiles();
+}
+
+function updateNavLinks() {
+    const navLinks = document.getElementById('nav-links');
+    let links = '';
+
+    if (!isLoggedIn) {
+        links += `
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showContent('login')">Đăng nhập</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showContent('register')">Đăng ký</a>
+            </li>
+        `;
+    } else {
+        if (userRole === 'manager') {
+            links += `
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showContent('organizeMeetings')">Tổ chức cuộc họp</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showContent('manageNotifications')">Quản lý thông báo</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showContent('manageEmployees')">Quản lý nhân viên</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showContent('manageProfiles')">Quản lý hồ sơ</a>
+                </li>
+            `;
+        } else {
+            links += `
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showContent('manageProfiles')">Quản lý hồ sơ</a>
+                </li>
+            `;
+        }
+        links += `
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="logout()">Đăng xuất</a>
+            </li>
+        `;
+    }
+
+    navLinks.innerHTML = links;
+}
+
+function login(event) {
+    event.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    if (username === 'manager' && password === 'manager') {
+        isLoggedIn = true;
+        userRole = 'manager';
+    } else if (username === 'employee' && password === 'employee') {
+        isLoggedIn = true;
+        userRole = 'employee';
+    } else {
+        alert('Sai tên đăng nhập hoặc mật khẩu');
+        return;
+    }
+
+    updateNavLinks();
+    showContent(userRole === 'manager' ? 'organizeMeetings' : 'manageProfiles');
+}
+
+function register(event) {
+    event.preventDefault();
+    alert('Đăng ký thành công! Bạn có thể đăng nhập bây giờ.');
+    showContent('login');
+}
+
+function logout() {
+    isLoggedIn = false;
+    userRole = '';
+    updateNavLinks();
+    showContent('login');
+}
+
+function showMeetingForm() {
+    document.getElementById('meetingForm').classList.remove('hidden');
+}
+
+function cancelMeeting() {
+    document.getElementById('meetingForm').classList.add('hidden');
+}
+
+function saveMeeting(event) {
+    event.preventDefault();
+    const meeting = {
+        name: document.getElementById('meetingName').value,
+        time: document.getElementById('meetingTime').value,
+        location: document.getElementById('meetingLocation').value,
+        description: document.getElementById('meetingDescription').value,
+    };
+    meetings.push(meeting);
+    loadMeetings();
+    cancelMeeting();
+}
+
+function loadMeetings() {
+    const meetingList = document.getElementById('meetingList');
+    let list = '<h3>Danh sách cuộc họp</h3><table class="table"><thead><tr><th>Tên cuộc họp</th><th>Thời gian</th><th>Địa điểm</th><th>Mô tả</th><th>Hành động</th></tr></thead><tbody>';
+    meetings.forEach((meeting, index) => {
+        list += `
+            <tr>
+                <td>${meeting.name}</td>
+                <td>${meeting.time}</td>
+                <td>${meeting.location}</td>
+                <td>${meeting.description}</td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="editMeeting(${index})">Sửa</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteMeeting(${index})">Xóa</button>
+                </td>
+            </tr>
+        `;
+    });
+    list += '</tbody></table>';
+    meetingList.innerHTML = list;
+}
+
+function editMeeting(index) {
+    const meeting = meetings[index];
+    document.getElementById('meetingName').value = meeting.name;
+    document.getElementById('meetingTime').value = meeting.time;
+    document.getElementById('meetingLocation').value = meeting.location;
+    document.getElementById('meetingDescription').value = meeting.description;
+    showMeetingForm();
+    deleteMeeting(index); // Remove the old entry, so it can be replaced by the updated one
+}
+
+function deleteMeeting(index) {
+    meetings.splice(index, 1);
+    loadMeetings();
+}
+
+function showNotificationForm() {
+    document.getElementById('notificationForm').classList.remove('hidden');
+}
+
+function cancelNotification() {
+    document.getElementById('notificationForm').classList.add('hidden');
+}
+
+function saveNotification(event) {
+    event.preventDefault();
+    const notification = {
+        content: document.getElementById('notificationContent').value,
+        time: document.getElementById('notificationTime').value,
+    };
+    notifications.push(notification);
+    loadNotifications();
+    cancelNotification();
+}
+
+function loadNotifications() {
+    const notificationList = document.getElementById('notificationList');
+    let list = '<h3>Danh sách thông báo</h3><table class="table"><thead><tr><th>Nội dung</th><th>Thời gian</th><th>Hành động</th></tr></thead><tbody>';
+    notifications.forEach((notification, index) => {
+        list += `
+            <tr>
+                <td>${notification.content}</td>
+                <td>${notification.time}</td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="editNotification(${index})">Sửa</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteNotification(${index})">Xóa</button>
+                </td>
+            </tr>
+        `;
+    });
+    list += '</tbody></table>';
+    notificationList.innerHTML = list;
+}
+
+function editNotification(index) {
+    const notification = notifications[index];
+    document.getElementById('notificationContent').value = notification.content;
+    document.getElementById('notificationTime').value = notification.time;
+    showNotificationForm();
+    deleteNotification(index); // Remove the old entry, so it can be replaced by the updated one
+}
+
+function deleteNotification(index) {
+    notifications.splice(index, 1);
+    loadNotifications();
+}
+
+function showEmployeeForm() {
+    document.getElementById('employeeForm').classList.remove('hidden');
+}
+
+function cancelEmployee() {
+    document.getElementById('employeeForm').classList.add('hidden');
+}
+
+function saveEmployee(event) {
+    event.preventDefault();
+    const employee = {
+        id: document.getElementById('employeeID').value,
+        name: document.getElementById('employeeName').value,
+        email: document.getElementById('employeeEmail').value,
+        phone: document.getElementById('employeePhone').value,
+        address: document.getElementById('employeeAddress').value,
+        dob: document.getElementById('employeeDOB').value,
+        position: document.getElementById('employeePosition').value,
+        department: document.getElementById('employeeDepartment').value,
+        startDate: document.getElementById('employeeStartDate').value,
+        salary: document.getElementById('employeeSalary').value,
+    };
+    employees.push(employee);
+    loadEmployees();
+    cancelEmployee();
+}
+
+function loadEmployees() {
+    const employeeList = document.getElementById('employeeList');
+    let list = '<h3>Danh sách nhân viên</h3><table class="table"><thead><tr><th>Mã nhân viên</th><th>Tên nhân viên</th><th>Email</th><th>Số điện thoại</th><th>Địa chỉ</th><th>Ngày sinh</th><th>Chức vụ</th><th>Phòng ban</th><th>Ngày vào làm</th><th>Lương</th><th>Hành động</th></tr></thead><tbody>';
+    employees.forEach((employee, index) => {
+        list += `
+            <tr>
+                <td>${employee.id}</td>
+                <td>${employee.name}</td>
+                <td>${employee.email}</td>
+                <td>${employee.phone}</td>
+                <td>${employee.address}</td>
+                <td>${employee.dob}</td>
+                <td>${employee.position}</td>
+                <td>${employee.department}</td>
+                <td>${employee.startDate}</td>
+                <td>${employee.salary}</td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="editEmployee(${index})">Sửa</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteEmployee(${index})">Xóa</button>
+                </td>
+            </tr>
+        `;
+    });
+    list += '</tbody></table>';
+    employeeList.innerHTML = list;
+}
+
+function editEmployee(index) {
+    const employee = employees[index];
+    document.getElementById('employeeID').value = employee.id;
+    document.getElementById('employeeName').value = employee.name;
+    document.getElementById('employeeEmail').value = employee.email;
+    document.getElementById('employeePhone').value = employee.phone;
+    document.getElementById('employeeAddress').value = employee.address;
+    document.getElementById('employeeDOB').value = employee.dob;
+    document.getElementById('employeePosition').value = employee.position;
+    document.getElementById('employeeDepartment').value = employee.department;
+    document.getElementById('employeeStartDate').value = employee.startDate;
+    document.getElementById('employeeSalary').value = employee.salary;
+    showEmployeeForm();
+    deleteEmployee(index); // Remove the old entry, so it can be replaced by the updated one
+}
+
+function deleteEmployee(index) {
+    employees.splice(index, 1);
+    loadEmployees();
+}
+
+function showProfileForm() {
+    document.getElementById('profileForm').classList.remove('hidden');
+}
+
+function cancelProfile() {
+    document.getElementById('profileForm').classList.add('hidden');
+}
+
+function saveProfile(event) {
+    event.preventDefault();
+    const profile = {
+        name: document.getElementById('profileName').value,
+        description: document.getElementById('profileDescription').value,
+        date: document.getElementById('profileDate').value,
+    };
+    profiles.push(profile);
+    loadProfiles();
+    cancelProfile();
+}
+
+function loadProfiles() {
+    const profileList = document.getElementById('profileList');
+    let list = '<h3>Danh sách hồ sơ</h3><table class="table"><thead><tr><th>Tên hồ sơ</th><th>Mô tả</th><th>Ngày</th><th>Hành động</th></tr></thead><tbody>';
+    profiles.forEach((profile, index) => {
+        list += `
+            <tr>
+                <td>${profile.name}</td>
+                <td>${profile.description}</td>
+                <td>${profile.date}</td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="editProfile(${index})">Sửa</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteProfile(${index})">Xóa</button>
+                </td>
+            </tr>
+        `;
+    });
+    list += '</tbody></table>';
+    profileList.innerHTML = list;
+}
+
+function editProfile(index) {
+    const profile = profiles[index];
+    document.getElementById('profileName').value = profile.name;
+    document.getElementById('profileDescription').value = profile.description;
+    document.getElementById('profileDate').value = profile.date;
+    showProfileForm();
+    deleteProfile(index); // Remove the old entry, so it can be replaced by the updated one
+}
+
+function deleteProfile(index) {
+    profiles.splice(index, 1);
+    loadProfiles();
+}
+
+updateNavLinks();
+showContent('login');
+</script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.9.3/umd/popper.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/5.1.3/js/bootstrap.min.js"></script>
+</body>
+</html>
